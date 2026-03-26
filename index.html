@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check-in Mandiri | RS SS Medika</title>
+  <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/drezmey/simpatik/refs/heads/main/icon-simpatik.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    body { background-color: #f7f7f7; font-family: 'Public Sans', sans-serif; }
+    .neo-card { border: 4px solid #000; box-shadow: 8px 8px 0px 0px #000; }
+    .neo-input { border: 4px solid #000; box-shadow: 4px 4px 0px 0px #000; }
+    .neo-btn { border: 3px solid #000; box-shadow: 4px 4px 0px 0px #000; transition: 0.1s; }
+    .neo-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px 0px #000; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body class="p-6 min-h-screen flex flex-col items-center justify-center">
+
+  <div class="w-full max-w-md">
+    <div id="waitScreen" class="neo-card bg-yellow-400 p-8 text-center">
+      <i class="fa-solid fa-clock text-6xl mb-4"></i>
+      <h1 class="text-3xl font-black uppercase italic mb-2 tracking-tighter">Sabar Ya...</h1>
+      <p class="font-bold uppercase text-xs mb-4">Pendaftaran Dibuka Dalam:</p>
+      <div id="timer" class="text-5xl font-black mb-4">00:00:00</div>
+      <div class="bg-black text-white p-2 text-[10px] font-bold uppercase tracking-widest">
+        Buka Otomatis Jam 08:00 WIB
+      </div>
+    </div>
+
+    <div id="checkinScreen" class="hidden">
+      <div class="neo-card bg-white p-6 mb-6">
+        <div class="text-center mb-6">
+          <h2 class="text-3xl font-black uppercase italic tracking-tighter">Self Check-In</h2>
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Silakan Konfirmasi Kehadiran Anda</p>
+        </div>
+
+        <div class="mb-6">
+          <label class="block font-black mb-2 uppercase text-xs tracking-widest">Input Kode Booking</label>
+          <input type="text" id="bookingInput" 
+                 class="neo-input w-full p-4 text-xl font-mono uppercase focus:outline-none" 
+                 placeholder="Contoh: BK123XXX">
+        </div>
+
+        <button onclick="submitCekin()" class="neo-btn bg-blue-500 text-white w-full py-4 font-black uppercase text-lg mb-4">
+          <i class="fa-solid fa-paper-plane mr-2"></i> Konfirmasi
+        </button>
+      </div>
+
+      <div id="resultArea" class="hidden"></div>
+    </div>
+  </div>
+
+  <script>
+    // 🔥 KONFIGURASI: Ganti dengan URL /exec Web App Anda yang terbaru
+    const API_URL = "https://script.google.com/macros/s/AKfycbz1NimF8Y9P4tI1u8wK_nK5abX6EI0yF3kY63ywlF38oeh-58jc6-rTHXAB7ry0sVfg/exec"; 
+
+    function checkTime() {
+      const now = new Date();
+      const target = new Date();
+      target.setHours(8, 0, 0, 0); // Jam 8 Pagi
+
+      if (now >= target) {
+        document.getElementById('waitScreen').classList.add('hidden');
+        document.getElementById('checkinScreen').classList.remove('hidden');
+      } else {
+        const diff = target - now;
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        document.getElementById('timer').innerText = 
+          `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      }
+    }
+
+    async function submitCekin() {
+      const kode = document.getElementById('bookingInput').value.trim();
+      if (!kode) return Swal.fire("Oops!", "Kode booking jangan dikosongkan ya.", "warning");
+
+      Swal.fire({ title: 'Memproses...', didOpen: () => Swal.showLoading() });
+
+      try {
+        const response = await fetch(`${API_URL}?action=doPatientCheckin&kode=${kode}`);
+        const result = await response.json();
+        Swal.close();
+
+        const resultArea = document.getElementById('resultArea');
+        resultArea.classList.remove('hidden');
+
+        if (result.success) {
+          resultArea.innerHTML = `
+            <div class="neo-card bg-green-400 p-6 text-center">
+              <h3 class="text-2xl font-black uppercase italic mb-2 tracking-tighter">✅ Check-in Berhasil!</h3>
+              <div class="bg-white p-4 border-2 border-black mb-4 text-left font-bold text-sm">
+                <p>Nama: ${result.nama}</p>
+                <p>Dokter: ${result.dokter}</p>
+                <p>Jam: ${result.estimasi_panggilan}</p>
+              </div>
+              <div class="bg-yellow-300 p-4 border-4 border-black inline-block w-full">
+                <p class="font-bold text-xs uppercase">Nomor Antrian</p>
+                <p class="text-6xl font-black">#${result.no_antrian}</p>
+              </div>
+              <p class="mt-4 text-[10px] font-bold italic">Silakan menunggu di ruang tunggu.</p>
+            </div>`;
+          document.getElementById('bookingInput').value = '';
+        } else {
+          Swal.fire("Gagal", result.message, "error");
+        }
+      } catch (e) {
+        Swal.fire("Error", "Gagal terhubung ke server. Pastikan deployment disetel ke 'Anyone'.", "error");
+      }
+    }
+
+    setInterval(checkTime, 1000);
+    checkTime();
+  </script>
+</body>
+</html>
