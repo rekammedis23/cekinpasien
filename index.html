@@ -21,12 +21,14 @@
 
   <div class="w-full max-w-md">
     <div id="waitScreen" class="neo-card bg-yellow-400 p-8 text-center">
-      <i class="fa-solid fa-clock text-6xl mb-4"></i>
-      <h1 class="text-3xl font-black uppercase italic mb-2 tracking-tighter">Sabar Ya...</h1>
-      <p class="font-bold uppercase text-xs mb-4">Pendaftaran Dibuka Dalam:</p>
+      <i id="waitIcon" class="fa-solid fa-clock text-6xl mb-4"></i>
+      <h1 id="waitTitle" class="text-3xl font-black uppercase italic mb-2 tracking-tighter">Sabar Ya...</h1>
+      <p id="waitSubtitle" class="font-bold uppercase text-xs mb-4">Pendaftaran Dibuka Dalam:</p>
+      
       <div id="timer" class="text-5xl font-black mb-4">00:00:00</div>
-      <div class="bg-black text-white p-2 text-[10px] font-bold uppercase tracking-widest">
-        Buka Otomatis Jam 08:00 WIB
+      
+      <div id="statusBadge" class="bg-black text-white p-2 text-[10px] font-bold uppercase tracking-widest">
+        Operasional: 08:00 - 20:00 WIB
       </div>
     </div>
 
@@ -55,32 +57,73 @@
   </div>
 
   <script>
-    // 🔥 KONFIGURASI: Ganti dengan URL /exec Web App Anda yang terbaru
+    // 🔥 KONFIGURASI API
     const API_URL = "https://script.google.com/macros/s/AKfycbz1NimF8Y9P4tI1u8wK_nK5abX6EI0yF3kY63ywlF38oeh-58jc6-rTHXAB7ry0sVfg/exec"; 
 
     function checkTime() {
       const now = new Date();
-      const target = new Date();
-      target.setHours(8, 0, 0, 0); // Jam 8 Pagi
+      
+      // Setup Waktu Buka (08:00)
+      const openTime = new Date();
+      openTime.setHours(8, 0, 0, 0);
 
-      if (now >= target) {
-        document.getElementById('waitScreen').classList.add('hidden');
-        document.getElementById('checkinScreen').classList.remove('hidden');
+      // Setup Waktu Tutup (20:00)
+      const closeTime = new Date();
+      closeTime.setHours(20, 0, 0, 0);
+
+      const waitScreen = document.getElementById('waitScreen');
+      const checkinScreen = document.getElementById('checkinScreen');
+      const timerDiv = document.getElementById('timer');
+      const waitTitle = document.getElementById('waitTitle');
+      const waitSubtitle = document.getElementById('waitSubtitle');
+      const waitIcon = document.getElementById('waitIcon');
+
+      // LOGIKA 1: JIKA SUDAH LEWAT JAM 20:00 (TUTUP)
+      if (now >= closeTime) {
+        waitScreen.classList.remove('hidden');
+        checkinScreen.classList.add('hidden');
+        
+        waitTitle.innerText = "Sudah Tutup";
+        waitSubtitle.innerText = "Pendaftaran Dibuka Besok Pagi";
+        waitIcon.className = "fa-solid fa-moon text-6xl mb-4"; // Ganti ikon jadi bulan
+        
+        // Hitung mundur ke jam 8 pagi besok
+        const tomorrowOpen = new Date();
+        tomorrowOpen.setDate(tomorrowOpen.getDate() + 1);
+        tomorrowOpen.setHours(8, 0, 0, 0);
+        updateTimer(tomorrowOpen - now);
+
+      // LOGIKA 2: JIKA SUDAH JAM 08:00 - 20:00 (BUKA)
+      } else if (now >= openTime && now < closeTime) {
+        waitScreen.classList.add('hidden');
+        checkinScreen.classList.remove('hidden');
+
+      // LOGIKA 3: JIKA BELUM JAM 08:00 (BELUM BUKA)
       } else {
-        const diff = target - now;
-        const h = Math.floor(diff / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-        document.getElementById('timer').innerText = 
-          `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        waitScreen.classList.remove('hidden');
+        checkinScreen.classList.add('hidden');
+        
+        waitTitle.innerText = "Sabar Ya...";
+        waitSubtitle.innerText = "Pendaftaran Dibuka Dalam:";
+        waitIcon.className = "fa-solid fa-clock text-6xl mb-4";
+        updateTimer(openTime - now);
       }
     }
 
+    function updateTimer(diff) {
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      document.getElementById('timer').innerText = 
+        `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    // Fungsi submitCekin tetap sama seperti sebelumnya
     async function submitCekin() {
       const kode = document.getElementById('bookingInput').value.trim();
       if (!kode) return Swal.fire("Oops!", "Kode booking jangan dikosongkan ya.", "warning");
 
-      Swal.fire({ title: 'Memproses...', didOpen: () => Swal.showLoading() });
+      Swal.fire({ title: 'Memproses...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
       try {
         const response = await fetch(`${API_URL}?action=doPatientCheckin&kode=${kode}`);
@@ -110,7 +153,7 @@
           Swal.fire("Gagal", result.message, "error");
         }
       } catch (e) {
-        Swal.fire("Error", "Gagal terhubung ke server. Pastikan deployment disetel ke 'Anyone'.", "error");
+        Swal.fire("Error", "Gagal terhubung ke server.", "error");
       }
     }
 
