@@ -9,18 +9,30 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
-    body { background-color: #f7f7f7; font-family: 'Public Sans', sans-serif; }
+    body { background-color: #f7f7f7; font-family: 'Public Sans', sans-serif; overflow-x: hidden; }
     .neo-card { border: 4px solid #000; box-shadow: 8px 8px 0px 0px #000; }
     .neo-input { border: 4px solid #000; box-shadow: 4px 4px 0px 0px #000; }
     .neo-btn { border: 3px solid #000; box-shadow: 4px 4px 0px 0px #000; transition: 0.1s; }
     .neo-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0px 0px #000; }
+    
+    /* Efek Fade Transition */
+    .fade-transition {
+      transition: opacity 0.8s ease-in-out, transform 0.8s ease-in-out;
+      opacity: 1;
+      transform: scale(1);
+    }
+    .fade-out {
+      opacity: 0;
+      transform: scale(0.95);
+      pointer-events: none;
+    }
     .hidden { display: none; }
   </style>
 </head>
 <body class="p-6 min-h-screen flex flex-col items-center justify-center">
 
   <div class="w-full max-w-md">
-    <div id="waitScreen" class="neo-card bg-yellow-400 p-8 text-center">
+    <div id="waitScreen" class="neo-card bg-yellow-400 p-8 text-center fade-transition">
       <i id="waitIcon" class="fa-solid fa-clock text-6xl mb-4"></i>
       <h1 id="waitTitle" class="text-3xl font-black uppercase italic mb-2 tracking-tighter">Sabar Ya...</h1>
       <p id="waitSubtitle" class="font-bold uppercase text-xs mb-4">Pendaftaran Dibuka Dalam:</p>
@@ -32,7 +44,7 @@
       </div>
     </div>
 
-    <div id="checkinScreen" class="hidden">
+    <div id="checkinScreen" class="fade-transition hidden">
       <div class="neo-card bg-white p-6 mb-6">
         <div class="text-center mb-6">
           <h2 class="text-3xl font-black uppercase italic tracking-tighter">Self Check-In</h2>
@@ -57,68 +69,73 @@
   </div>
 
   <script>
-    // 🔥 KONFIGURASI API
     const API_URL = "https://script.google.com/macros/s/AKfycbz1NimF8Y9P4tI1u8wK_nK5abX6EI0yF3kY63ywlF38oeh-58jc6-rTHXAB7ry0sVfg/exec"; 
 
     function checkTime() {
       const now = new Date();
       
-      // Setup Waktu Buka (08:00)
       const openTime = new Date();
       openTime.setHours(8, 0, 0, 0);
 
-      // Setup Waktu Tutup (20:00)
       const closeTime = new Date();
       closeTime.setHours(20, 0, 0, 0);
 
       const waitScreen = document.getElementById('waitScreen');
       const checkinScreen = document.getElementById('checkinScreen');
+
+      // LOGIKA: JAM OPERASIONAL (08:00 - 19:59:59)
+      if (now >= openTime && now < closeTime) {
+        if (checkinScreen.classList.contains('hidden')) {
+          transitionSwitch(waitScreen, checkinScreen);
+        }
+      } 
+      // LOGIKA: DI LUAR JAM OPERASIONAL
+      else {
+        if (waitScreen.classList.contains('hidden')) {
+          transitionSwitch(checkinScreen, waitScreen);
+        }
+        updateWaitUI(now, openTime, closeTime);
+      }
+    }
+
+    // Fungsi untuk perpindahan halus (Fade Out -> Fade In)
+    function transitionSwitch(elToHide, elToShow) {
+      elToHide.classList.add('fade-out');
+      setTimeout(() => {
+        elToHide.classList.add('hidden');
+        elToShow.classList.remove('hidden', 'fade-out');
+      }, 800); // Durasi sesuai CSS
+    }
+
+    function updateWaitUI(now, openTime, closeTime) {
       const timerDiv = document.getElementById('timer');
       const waitTitle = document.getElementById('waitTitle');
       const waitSubtitle = document.getElementById('waitSubtitle');
       const waitIcon = document.getElementById('waitIcon');
+      let diff;
 
-      // LOGIKA 1: JIKA SUDAH LEWAT JAM 20:00 (TUTUP)
       if (now >= closeTime) {
-        waitScreen.classList.remove('hidden');
-        checkinScreen.classList.add('hidden');
-        
         waitTitle.innerText = "Cekin Antrian Sudah Tutup";
         waitSubtitle.innerText = "Pendaftaran Dibuka Besok Pagi";
-        waitIcon.className = "fa-solid fa-moon text-6xl mb-4"; // Ganti ikon jadi bulan
+        waitIcon.className = "fa-solid fa-moon text-6xl mb-4 text-slate-800";
         
-        // Hitung mundur ke jam 8 pagi besok
-        const tomorrowOpen = new Date();
-        tomorrowOpen.setDate(tomorrowOpen.getDate() + 1);
-        tomorrowOpen.setHours(8, 0, 0, 0);
-        updateTimer(tomorrowOpen - now);
-
-      // LOGIKA 2: JIKA SUDAH JAM 08:00 - 20:00 (BUKA)
-      } else if (now >= openTime && now < closeTime) {
-        waitScreen.classList.add('hidden');
-        checkinScreen.classList.remove('hidden');
-
-      // LOGIKA 3: JIKA BELUM JAM 08:00 (BELUM BUKA)
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(8, 0, 0, 0);
+        diff = tomorrow - now;
       } else {
-        waitScreen.classList.remove('hidden');
-        checkinScreen.classList.add('hidden');
-        
         waitTitle.innerText = "Sabar Ya...";
         waitSubtitle.innerText = "Pendaftaran Dibuka Dalam:";
         waitIcon.className = "fa-solid fa-clock text-6xl mb-4";
-        updateTimer(openTime - now);
+        diff = openTime - now;
       }
-    }
-
-    function updateTimer(diff) {
+      
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
       const s = Math.floor((diff % 60000) / 1000);
-      document.getElementById('timer').innerText = 
-        `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      timerDiv.innerText = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
     }
 
-    // Fungsi submitCekin tetap sama seperti sebelumnya
     async function submitCekin() {
       const kode = document.getElementById('bookingInput').value.trim();
       if (!kode) return Swal.fire("Oops!", "Kode booking jangan dikosongkan ya.", "warning");
